@@ -30,3 +30,5 @@ This project explores the basics of data analysis for sales data. This project i
 - Price Each
 - Order Date
 - Purchase Address
+
+### More Sales Related KPIs can be found in https://www.netsuite.com/portal/resource/articles/accounting/sales-kpis.shtml
