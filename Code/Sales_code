@@ -1,1 +1,194 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+@author: sindhu19s
+Created on Mon Jul 17 15:07:39 2023
 
+First Project for Sales Data reflections
+
+I Had 12 files in csv and i made it into 1 file called "df_year", below is the code used
+"""
+import pandas as pd
+import matplotlib.pyplot as plt
+import os
+from itertools import combinations
+from collections import Counter
+
+# import datetime as dt
+
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', None)
+
+path = "/Users/apple/Desktop/Datasets/Datasets/Pandas-Data-Science-Tasks-master/SalesAnalysis/Sales_Data"
+
+files = [file for file in os.listdir(path) if not file.startswith('.')] # Ignore hidden files
+
+print(files)
+
+all_months_data = pd.DataFrame()
+
+for file in files:
+    current_data = pd.read_csv(path+"/"+file)
+    all_months_data = pd.concat([all_months_data, current_data])
+    
+all_months_data.to_csv("/Users/apple/Desktop/Datasets/Datasets/Pandas-Data-Science-Tasks-master/SalesAnalysis/Sales_Data/whole_year.csv", index=False)
+
+all_data = pd.read_csv("/Users/apple/Desktop/Datasets/Datasets/Pandas-Data-Science-Tasks-master/SalesAnalysis/Sales_Data/whole_year.csv")
+print(all_data.head(5))
+print(all_data.info())
+print(all_data.describe())
+print(all_data.shape) #186850
+
+# Check if DataFrame has null rows by using below with axis
+nulls= all_data[all_data.isnull().any(axis=1)]
+print(nulls.head(5))
+na_before=all_data.shape[0]
+print(na_before) #186850
+
+# Drop all the rows that have all the columns as NAN
+all_data = all_data.dropna(how='all')
+print(all_data.shape[0]) #186305
+print("Total Dropped Rows are :"+ str(na_before - all_data.shape[0])) #545
+
+#Get Months from Order Date , coerce sets invalid to NAN 
+all_data['month']=pd.to_datetime(all_data['Order Date'],errors='coerce').dt.month
+# Find unique values in the month 
+print(sorted(pd.unique(all_data['month'])))
+#[12.0, nan, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0]
+
+""" I got NAN value after above step because order Date had "Order Date" value so i have to do drop again """
+
+print(all_data['month'].isna().sum()) # 355 columns have "Order Date in the field of month so drop the rows 
+all_data = all_data.dropna(how='all', subset=['month']) 
+print(all_data.shape) #185950
+
+# Convert Month from float to int
+all_data['month']=all_data['month'].astype(int)
+
+#Convert Quantity Ordered , Price Each into int and float respectively
+all_data['Quantity Ordered']=pd.to_numeric(all_data["Quantity Ordered"])
+all_data['Price Each']=pd.to_numeric(all_data["Price Each"])
+
+print(all_data.info())
+
+# Get  Address , PinCOde , City from address 
+all_data['pincode']=all_data['Purchase Address'].str[-5:]
+
+def get_city(address):
+    return address.split(",")[1].strip(" ")
+
+def get_state(address):
+    return address.split(",")[2].split(" ")[1]
+
+def home_address(address):
+    return address.split(",")[0]
+
+all_data['city'] = all_data['Purchase Address'].apply(lambda x: f"{get_city(x)}")
+
+all_data['State']=all_data['Purchase Address'].apply(lambda x:f"{get_state(x)}")
+                       
+all_data['Address']=all_data['Purchase Address'].apply(lambda x:f"{home_address(x)}")   
+
+all_data['CS'] = all_data['Purchase Address'].apply(lambda x: f"{get_city(x)}  ({get_state(x)})")
+print(all_data.shape) #185950
+                
+
+# What is the best month for sales?
+all_data["sales"]=all_data['Quantity Ordered'] * all_data['Price Each']
+all_data.groupby(['month'],as_index=False)['sales'].sum() # Month
+all_data.groupby(['CS','month'],as_index=False)['sales'].sum() # city and month wise sales
+
+# Plot the Graph now
+month=range(1,13)
+print(month)
+plt.ylabel('Sales in USD ($)')
+plt.xlabel('Month number')
+plt.bar(month,all_data.groupby(['month'])['sales'].sum())
+plt.xticks(month)
+plt.show(block=True)
+
+# What city sold the most product?
+z=all_data.groupby(['city'],as_index=False)['sales'].sum()
+print(z)
+
+# Plot the Graph now , be mindful of the order of cities on x and y axis 
+y=sorted(all_data['city'].unique())
+print(y)
+plt.bar(y,z['sales'])
+plt.xticks(y , rotation='vertical' , size=8)
+plt.ylabel('Sales in USD')
+plt.xlabel('City')
+plt.show(block=True)
+
+# What time should we display advertisements to maximize likelihood of customer's buying product?
+
+# Add hour and minutes
+
+all_data['hour']=pd.to_datetime(all_data['Order Date'],errors='coerce').dt.hour
+
+all_data['minute']=pd.to_datetime(all_data['Order Date'],errors='coerce').dt.minute
+
+print(sorted(all_data['minute'].unique()))
+y1=sorted(all_data['hour'].unique())
+z1=all_data.groupby(['hour'],as_index=False)['sales'].count()
+print(z1)
+plt.plot(y1,z1)
+plt.xlabel('hour 24hour cycle')
+plt.ylabel('Count of sales')
+plt.xticks(y1)
+plt.grid()
+plt.show(block=True)
+
+# What products are most often sold together? 
+# Logic : Get all the rows with same order id in an order , items with same order id was ordered at the same time.
+print(all_data.shape)
+
+#df dataframe contains only records where order id is there multiple times
+df = all_data[all_data['Order ID'].duplicated(keep=False)]
+print(df.head(20))
+print(df.shape) #14649
+
+df['Grouped'] = df.groupby('Order ID')['Product'].transform(lambda x: ','.join(x))
+print(df.shape) #(14649,16)
+
+df2 = df[['Order ID','Grouped']].drop_duplicates()
+
+df2.to_csv('/Users/apple/Desktop/DataSets/Datasets/Pandas-Data-Science-Tasks-master/SalesAnalysis/Sales_Data/df2.csv')
+
+print(df2.shape) #7136,2
+
+count = Counter()
+for row in df2['Grouped']:
+    row_list = row.split(',')
+    count.update(Counter(combinations(row_list,2)))
+
+for key,value in count.most_common(10):
+    print(key, value)
+    
+# What product sold the most?
+all_data.groupby(['Product'],as_index=False)['Quantity Ordered'].sum().sort_values(by='Quantity Ordered',ascending=False) 
+
+
+# Plot Graphs
+product_group = all_data.groupby('Product')
+quantity_ordered = product_group.sum()['Quantity Ordered']
+keys = [pair for pair, df in product_group]
+plt.bar(keys, quantity_ordered)
+plt.xticks(keys, rotation='vertical', size=8)
+plt.show()
+plt.show(block=True)
+
+prices=all_data.groupby(['Product'])['Price Each'].mean()
+
+fig, ax1 = plt.subplots()
+ax2 = ax1.twinx()
+ax1.bar(keys, quantity_ordered, color='g')
+ax2.plot(keys, prices, color='r')
+
+ax1.set_xlabel('Product Name')
+ax1.set_ylabel('Quantity Ordered', color='g')
+ax2.set_ylabel('Price ($)', color='b')
+ax1.set_xticklabels(keys, rotation='vertical', size=8)
+
+fig.show()
