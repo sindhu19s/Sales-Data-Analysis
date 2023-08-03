@@ -20,4 +20,13 @@ This project explores the basics of data analysis for sales data. This project i
 - What time should we display advertisemens to maximize the likelihood of customer’s buying product?
 - What products are most often sold together?
 - What product sold the most?
+- KPI: Monthly Sales Growth :
+   ((Sales for the current month - sales for the prior month) / sales for the prior month) x 100
 
+### Original Data Set Contains below columns:
+- Order ID
+- Product
+- Quantity Ordered
+- Price Each
+- Order Date
+- Purchase Address
